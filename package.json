@@ -1,0 +1,6 @@
+{
+  "name": "@stockback/settlement-keeper",
+  "version": "0.2.0",
+  "description": "Buys the brand's tokenized share on Uniswap v3 on Robinhood Chain and delivers it to the claimant in one transaction.",
+  "type": "module",
+  "bin": { "stockback-settle": "settle.mjs" },
