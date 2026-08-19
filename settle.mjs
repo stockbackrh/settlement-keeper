@@ -7,7 +7,7 @@ import { ethers } from 'ethers';
 import { WETH, USDG, ROUTER, QUOTER, provider, erc20 } from './lib/chain.mjs';
 import { bestFee } from './lib/pools.mjs';
 import { ethForUsd, minOut, overCap } from './lib/size.mjs';
-import { pending, mark } from './lib/store.mjs';
+
 const env = process.env, DRY = process.argv.includes('--dry'), LOOP = process.argv.includes('--loop');
 const MAX_ETH = Number(env.MAX_ETH_PER_CLAIM || '0.02');
 const p = provider();
@@ -28,3 +28,7 @@ async function settle(c) {
   const fee = await bestFee(p, token);
   const eth = ethForUsd(c.reward_usd, await ethPrice());
   if (overCap(eth, MAX_ETH)) return mark(c.id, 'queued', null, null, 'reward above per-claim ETH cap');
+  const amountIn = ethers.parseEther(eth.toFixed(18));
+  const q = await quoter.quoteExactInput.staticCall(path(fee, token), amountIn);
+  const dec = await erc20(p, token).decimals();
+  console.log(`  ${c.ticker} $${c.reward_usd} -> ${eth.toFixed(6)} ETH -> ~${ethers.formatUnits(q[0], dec)} ${c.ticker} (fee ${fee})`);
