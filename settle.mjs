@@ -7,6 +7,7 @@ import { ethers } from 'ethers';
 import { WETH, USDG, ROUTER, QUOTER, provider, erc20 } from './lib/chain.mjs';
 import { bestFee } from './lib/pools.mjs';
 import { ethForUsd, minOut, overCap } from './lib/size.mjs';
+import { pending, mark } from './lib/store.mjs';
 
 const env = process.env, DRY = process.argv.includes('--dry'), LOOP = process.argv.includes('--loop');
 const MAX_ETH = Number(env.MAX_ETH_PER_CLAIM || '0.02');
@@ -32,3 +33,9 @@ async function settle(c) {
   const q = await quoter.quoteExactInput.staticCall(path(fee, token), amountIn);
   const dec = await erc20(p, token).decimals();
   console.log(`  ${c.ticker} $${c.reward_usd} -> ${eth.toFixed(6)} ETH -> ~${ethers.formatUnits(q[0], dec)} ${c.ticker} (fee ${fee})`);
+  if (DRY || !wallet) return console.log('  dry run, not sent');
+  const bal = await p.getBalance(wallet.address);
+  if (bal < amountIn + ethers.parseEther('0.001')) return mark(c.id, 'queued', null, null, 'treasury low on ETH');
+  const tx = await router.exactInput({ path: path(fee, token), recipient: c.wallet, amountIn, amountOutMinimum: minOut(q[0]) }, { value: amountIn });
+  const rc = await tx.wait();
+  if (rc.status !== 1) return mark(c.id, 'queued', tx.hash, null, 'swap reverted');
