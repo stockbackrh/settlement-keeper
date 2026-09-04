@@ -39,3 +39,8 @@ async function settle(c) {
   const tx = await router.exactInput({ path: path(fee, token), recipient: c.wallet, amountIn, amountOutMinimum: minOut(q[0]) }, { value: amountIn });
   const rc = await tx.wait();
   if (rc.status !== 1) return mark(c.id, 'queued', tx.hash, null, 'swap reverted');
+  const topic = ethers.id('Transfer(address,address,uint256)'), to = ethers.zeroPadValue(c.wallet, 32).toLowerCase();
+  let got = 0n;
+  for (const l of rc.logs) if (l.address.toLowerCase() === token.toLowerCase() && l.topics[0] === topic && l.topics[2].toLowerCase() === to) got += BigInt(l.data);
+  await mark(c.id, 'settled', tx.hash, Number(ethers.formatUnits(got, dec)), null);
+  console.log(`  settled ${ethers.formatUnits(got, dec)} ${c.ticker} -> ${c.wallet} ${tx.hash}`);
