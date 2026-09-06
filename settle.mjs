@@ -25,7 +25,6 @@ async function ethPrice() {
 
 async function settle(c) {
   const token = c.token_address;
-  if (!token) return mark(c.id, 'queued', null, null, 'no token address for ' + c.ticker);
   const fee = await bestFee(p, token);
   const eth = ethForUsd(c.reward_usd, await ethPrice());
   if (overCap(eth, MAX_ETH)) return mark(c.id, 'queued', null, null, 'reward above per-claim ETH cap');
@@ -44,3 +43,13 @@ async function settle(c) {
   for (const l of rc.logs) if (l.address.toLowerCase() === token.toLowerCase() && l.topics[0] === topic && l.topics[2].toLowerCase() === to) got += BigInt(l.data);
   await mark(c.id, 'settled', tx.hash, Number(ethers.formatUnits(got, dec)), null);
   console.log(`  settled ${ethers.formatUnits(got, dec)} ${c.ticker} -> ${c.wallet} ${tx.hash}`);
+}
+
+async function run() {
+  console.log(new Date().toISOString(), 'pending', rows.length, wallet ? 'treasury ' + wallet.address : 'read only');
+  for (const c of rows) {
+    try { await settle(c); }
+    catch (e) { console.log('  fail', c.id, e.shortMessage || e.message); await mark(c.id, 'queued', null, null, String(e.shortMessage || e.message).slice(0, 200)).catch(() => {}); }
+  }
+}
+if (LOOP) { for (;;) { await run().catch(e => console.log('run error', e.message)); await new Promise(r => setTimeout(r, 60_000)); } } else await run();
