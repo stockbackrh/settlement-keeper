@@ -15,7 +15,6 @@ const p = provider();
 const wallet = env.TREASURY_PK ? new ethers.Wallet(env.TREASURY_PK, p) : null;
 const quoter = new ethers.Contract(QUOTER, ['function quoteExactInput(bytes path, uint256 amountIn) returns (uint256 amountOut, uint160[] a, uint32[] b, uint256 c)'], p);
 const router = new ethers.Contract(ROUTER, ['function exactInput((bytes path,address recipient,uint256 amountIn,uint256 amountOutMinimum)) payable returns (uint256 amountOut)'], wallet || p);
-const path = (fee, token) => ethers.solidityPacked(['address', 'uint24', 'address', 'uint24', 'address'], [WETH, 100, USDG, fee, token]);
 
 async function ethPrice() {
   const probe = ethers.parseEther('0.001');
@@ -25,6 +24,7 @@ async function ethPrice() {
 
 async function settle(c) {
   const token = c.token_address;
+  if (!token) return mark(c.id, 'queued', null, null, 'no token address for ' + c.ticker);
   const fee = await bestFee(p, token);
   const eth = ethForUsd(c.reward_usd, await ethPrice());
   if (overCap(eth, MAX_ETH)) return mark(c.id, 'queued', null, null, 'reward above per-claim ETH cap');
@@ -46,10 +46,7 @@ async function settle(c) {
 }
 
 async function run() {
+  const rows = await pending();
   console.log(new Date().toISOString(), 'pending', rows.length, wallet ? 'treasury ' + wallet.address : 'read only');
   for (const c of rows) {
     try { await settle(c); }
-    catch (e) { console.log('  fail', c.id, e.shortMessage || e.message); await mark(c.id, 'queued', null, null, String(e.shortMessage || e.message).slice(0, 200)).catch(() => {}); }
-  }
-}
-if (LOOP) { for (;;) { await run().catch(e => console.log('run error', e.message)); await new Promise(r => setTimeout(r, 60_000)); } } else await run();
