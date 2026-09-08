@@ -4,3 +4,8 @@
   "description": "Buys the brand's tokenized share on Uniswap v3 on Robinhood Chain and delivers it to the claimant in one transaction.",
   "type": "module",
   "bin": { "stockback-settle": "settle.mjs" },
+  "scripts": { "test": "node --test", "dry": "node settle.mjs --dry", "loop": "node settle.mjs --loop" },
+  "dependencies": { "ethers": "^6.13.4" },
+  "license": "MIT",
+  "repository": "github:stockbackrh/settlement-keeper"
+}
